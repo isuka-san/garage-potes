@@ -1,0 +1,17 @@
+{
+  "name": "garage-potes",
+  "version": "1.0.0",
+  "description": "Prise de RDV entre potes pour le garage",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "date-fns": "^3.3.1",
+    "express": "^4.19.2",
+    "ics": "^3.7.2",
+    "uuid": "^9.0.0"
+  }
+}
