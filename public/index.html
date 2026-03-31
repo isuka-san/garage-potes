@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Garage des Potes (V1)</title>
+  <style>
+    body { background:#050505; color:#f1f1f1; font-family:system-ui, sans-serif; margin:0; }
+    header { padding:1.25rem; background:#0c0c0c; border-bottom:1px solid #222; display:flex; align-items:center; justify-content:space-between; }
+    header h1 { margin:0; font-size:1.4rem; }
+    main { padding:1.5rem; max-width:1200px; margin:0 auto; display:grid; gap:1.25rem; }
+    .card { background:#111; border:1px solid #222; border-radius:12px; padding:1.25rem; }
+    h2 { margin:0 0 0.75rem; font-size:1.1rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1rem; }
+    label { display:block; font-size:0.75rem; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.35rem; }
+    input, select, textarea { width:100%; padding:0.65rem; border-radius:8px; border:1px solid #1f1f1f; background:#0b0b0b; color:#fff; }
+    button { border:none; border-radius:999px; padding:0.6rem 1.2rem; background:#f97316; color:#fff; font-weight:600; cursor:pointer; }
+    ul { list-style:none; padding:0; margin:0; }
+    li { padding:0.65rem 0; border-bottom:1px solid #1f1f1f; }
+    li:last-child { border-bottom:none; }
+    .small { font-size:0.8rem; color:#9ca3af; }
+    .flex { display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center; }
+    .pill { padding:0.2rem 0.7rem; border-radius:999px; background:#1f2937; font-size:0.75rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Garage des Potes</h1>
+      <p class="small">Version 1 — API de base</p>
+    </div>
+    <div class="pill" id="status-pill">Offline</div>
+  </header>
+  <main>
+    <section class="card">
+      <h2>Créer un membre</h2>
+      <form id="member-form">
+        <label for="member-name">Prénom ou pseudo</label>
+        <input id="member-name" required />
+        <label for="member-phone">Téléphone</label>
+        <input id="member-phone" />
+        <button type="submit">Ajouter</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Ajouter un véhicule</h2>
+      <form id="car-form">
+        <label for="car-member">Membre</label>
+        <select id="car-member"></select>
+        <label for="car-name">Nom du véhicule</label>
+        <input id="car-name" required />
+        <label for="car-brand">Marque</label>
+        <input id="car-brand" />
+        <label for="car-model">Modèle</label>
+        <input id="car-model" />
+        <label for="car-plate">Plaque</label>
+        <input id="car-plate" />
+        <button type="submit">Ajouter</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Créer un rendez-vous</h2>
+      <form id="appointment-form">
+        <label for="appointment-member">Membre</label>
+        <select id="appointment-member"></select>
+        <label for="appointment-car">Voiture</label>
+        <select id="appointment-car"></select>
+        <label for="appointment-service">Service</label>
+        <select id="appointment-service"></select>
+        <label for="appointment-date">Date & heure</label>
+        <input id="appointment-date" type="datetime-local" required />
+        <button type="submit">Planifier</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Liste des membres</h2>
+      <ul id="members-list"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Rendez-vous</h2>
+      <ul id="appointments-list"></ul>
+    </section>
+  </main>
+
+  <script>
+    const api = async (method, url, data) => {
+      const opts = { method, headers: { "Content-Type": "application/json" } };
+      if (data) opts.body = JSON.stringify(data);
+      const res = await fetch(url, opts);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw json;
+      return json;
+    };
+
+    const populateMembers = async () => {
+      const members = await api("GET", "/api/members");
+      document.getElementById("members-list").innerHTML = members.map(m => `
+        <li>
+          <strong>${m.name}</strong> <span class="small">${m.phone || "—"}</span>
+        </li>
+      `).join("");
+      const memberOptions = members.map(m => `<option value="${m.id}">${m.name}</option>`).join("");
+      ["car-member", "appointment-member"].forEach(id => {
+        document.getElementById(id).innerHTML = '<option value="">— Sélectionner —</option>' + memberOptions;
+      });
+    };
+
+    const populateCars = async () => {
+      const memberId = document.getElementById("car-member").value || document.getElementById("appointment-member").value;
+      const carsEl = document.getElementById("car-member");
+      if (!memberId) return;
+      const cars = await api("GET", `/api/members/${memberId}/cars`);
+      document.getElementById("appointment-car").innerHTML = '<option value="">— Sélectionner —</option>' + cars.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+    };
+
+    const loadAppointments = async () => {
+      const appointments = await api("GET", "/api/appointments");
+      document.getElementById("appointments-list").innerHTML = appointments.map(a => `
+        <li>
+          <div class="flex">
+            <strong>${a.service_name}</strong>
+            <span class="pill">${a.status}</span>
+          </div>
+          <div class="small">${new Date(a.scheduled_at).toLocaleString()} · ${a.member_name}</div>
+        </li>
+      `).join("");
+    };
+
+    document.getElementById("member-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const name = document.getElementById("member-name").value.trim();
+      const phone = document.getElementById("member-phone").value.trim();
+      if (!name) return;
+      await api("POST", "/api/members", { name, phone });
+      document.getElementById("member-form").reset();
+      populateMembers();
+    });
+
+    document.getElementById("car-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const member_id = document.getElementById("car-member").value;
+      const name = document.getElementById("car-name").value.trim();
+      if (!member_id || !name) return;
+      await api("POST", "/api/cars", {
+        member_id,
+        name,
+        brand: document.getElementById("car-brand").value.trim(),
+        model: document.getElementById("car-model").value.trim(),
+        plate: document.getElementById("car-plate").value.trim()
+      });
+      document.getElementById("car-form").reset();
+      populateMembers();
+      populateCars();
+    });
+
+    document.getElementById("appointment-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const member_id = document.getElementById("appointment-member").value;
+      const car_id = document.getElementById("appointment-car").value;
+      const service_id = document.getElementById("appointment-service").value;
+      const scheduled_at = document.getElementById("appointment-date").value;
+      if (!member_id || !car_id || !service_id || !scheduled_at) return;
+      await api("POST", "/api/appointments", { member_id, car_id, service_id, scheduled_at });
+      document.getElementById("appointment-form").reset();
+      loadAppointments();
+    });
+
+    const populateServices = async () => {
+      const services = await api("GET", "/api/services");
+      document.getElementById("appointment-service").innerHTML = '<option value="">— Sélectionner —</option>' + services.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+    };
+
+    document.getElementById("car-member").addEventListener("change", populateCars);
+    document.getElementById("appointment-member").addEventListener("change", populateCars);
+
+    Promise.all([populateMembers(), populateServices(), loadAppointments()]).then(() => {
+      document.getElementById("status-pill").textContent = "Prêt";
+    });
+  </script>
+</body>
+</html>
