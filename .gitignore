@@ -1,0 +1,4 @@
+node_modules/
+garage.db
+*.db
+.env
